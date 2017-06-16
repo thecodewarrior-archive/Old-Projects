@@ -1,0 +1,1 @@
+{"rustc":9772576881321684952,"target":4086851835445132369,"profile":11154289914177168617,"local":{"variant":"Precalculated","fields":["0.12.1"]},"features":"None","deps":[["phf_codegen v0.7.21",2368384301437423279],["quote v0.3.12",13393376378948104849],["rustc-serialize v0.3.22",15672567509584671812],["syn v0.10.7",9640391095833475052]],"rustflags":[]}

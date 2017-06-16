@@ -1,0 +1,16 @@
+[package]
+name = "learning"
+version = "0.1.0"
+authors = ["Pierce Corcoran <pierce@plasticcow.com>"]
+
+[dependencies]
+
+hyper = "*"
+rand="0.3.0"
+html5ever="*"
+url="*"
+regex="*"
+lazy_static="*"
+rustc-serialize="*"
+clap="*"
+termion="*"
