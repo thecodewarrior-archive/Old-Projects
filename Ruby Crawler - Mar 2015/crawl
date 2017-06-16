@@ -1,0 +1,258 @@
+#!/usr/bin/env ruby
+
+# files
+require_relative 'lib/crawl.rb'
+require_relative 'lib/helpers.rb'
+require_relative 'crawl_helpers.rb'
+
+# stdlib
+require 'socket'
+require 'curses'
+require 'time'
+require 'fileutils'
+
+# rubygems
+require 'rubygems'
+require 'term/ansicolor'
+
+class String
+  include Term::ANSIColor
+end
+
+# box drawing char constants
+
+H  = '─' # horizontal 
+V  = '│' # vertical
+TL = '┌' # top left
+TR = '┐' # top right
+BL = '└' # bottom left
+BR = '┘' # bottom right
+LS = '├' # left side
+RS = '┤' # right side
+BS = '┴' # bottom side
+TS = '┬' # top side
+CR = '┼' # cross
+
+include Curses
+
+init_screen
+nl
+# make sure shell prints a carrage return after line break
+`stty onlcr`
+# create unix socket for crawler/ui communication
+parent, child = UNIXSocket.pair
+loopback = child.dup
+
+init_sputs parent.dup
+init_lb  loopback.dup
+
+SaveId   = 0 || ARGV[1].to_i
+SaveName = 'Test' || ARGV[2]
+
+$pid = fork do
+  
+  parent.close
+  
+  start_crawler(child.dup, File.join(File.expand_path(File.dirname(__FILE__)),'saves', "#{SaveId}_#{SaveName}") )
+  
+end
+
+child.close
+
+
+
+quit = false
+
+def sputs(str)
+  parent.write "#{str}\n"
+end
+
+# (fold) globals
+TIMEOUT_MILLIS = 60_000
+$screen_text = ""
+emails = ["","","","",""]
+phones = ["","","","",""]
+link_count = 0
+email_count = 0
+phone_count = 0
+
+crawl_url = ""
+
+status = ""
+old_status = ""
+old_status_time = Time.now
+
+help = false
+trace = nil
+
+double_key = nil
+
+# (end)
+
+
+# Kill crawler, clear screen, and reset stty settings
+def clean()
+  Process.kill 9, $pid
+  clear
+  refresh
+  setpos(0,0)
+  refresh
+  `sleep 0.1 && stty sane &`
+end
+
+at_exit {
+  clean()
+}
+
+begin
+  timeout_thread = nil
+  input_thread = Thread.new do 
+    Thread.current.priority = -2
+    loop do
+      sleep(0.5)
+      ch = readch(true)
+      case ch
+        
+      when :ctrl_n
+        parent.write "skip"
+        
+      when :ctrl_q
+        if double_key == :ctrl_q
+          double_key = nil
+          parent.write "quit"
+          quit = true
+        else
+          double_key = :ctrl_q
+        end
+        
+      when :ctrl_c
+        beep; beep
+        exit 1
+        
+      when :key_?
+        help = true
+        
+      when :key_b, :key_B
+        help = false if help
+        
+      when :__error__
+      
+      end
+      double_key = ch
+      lb_refresh
+    end
+  end
+  
+  while message = parent.recv(1000)
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    next if message == ""
+    case message.chomp   
+      when /^crawling (.*)$/
+        crawl_url = $1
+        emails = ["","","","",""]
+        phones = ["","","","",""]
+        link_count = 0
+        email_count = 0
+        phone_count = 0
+        timeout_thread.kill if timeout_thread
+        timeout_thread = Thread.new do
+          Thread.current.priority = -3
+          sleep TIMEOUT_MILLIS
+          parent.write "skip"
+        end
+      when /^u: (.*)$/ # url
+        link_count += 1
+      
+      when /^p: (.*)$/ # phone
+        phones.shift
+        phones << $1
+        phone_count += 1
+      
+      when /^e: (.*)$/
+        emails.shift
+        emails << $1
+        email_count += 1
+      
+      when /^scraping line (\d*)$/
+        status = "extracting data...line #{$1}"
+        
+      when /^error: (.*); trace: (.*)$/
+        status = "error: #{$1}"
+        trace = "foobar" #Marshal.load($2)
+        
+      when /^quitting: (.*)$/
+        quit = true
+        status = "Quitting because ".red.bold + $1.blue.bold
+        
+      when /^skipping: (.*)$/
+        status = "Skipping because ".red.bold + $1.blue.bold
+        
+      when "error: not text"
+        status = "document not text".red
+      
+      when "error: timeout"
+        status = "server not responding".red
+      
+      when "downloading"
+        status = "downloading..."
+      
+      when "checking headers"
+        status = "checking document type..."
+      
+      when "scraping"
+        status = "extracting data..."
+        
+      when "starting"
+        # just continue
+      when "lb> refresh"
+        # just continue
+      else
+        status = "unknown message: ".white + message.chomp.red
+    end
+    if status != old_status
+      old_status = status
+      old_status_time = Time.now
+    end
+    
+    dif = Time.now - old_status_time
+    if dif > 2
+      old_status = status = status.dark
+    end
+      
+    if quit
+      raise "Quitting"
+    end
+    # display data on screen
+    halflen = (cols/2)
+    
+    if help
+      addln "memory tips in {curly brackets}"
+      addln "Keys:"
+      addln "    Ctrl-N - skip current url {Control + 'Next'}"
+      addln " Ctrl-Q x2 - Quit {Control + 'Quit'}"
+      addln "         B - Back (eg. from help to main screen)"
+    else      
+      addln hor_sep_t
+      addln V + makewidth(crawl_url,cols-2) + V
+      addln hor_sep_c
+      addln V + makewidth(status,cols-2) + V
+      addln addtocenter(hor_sep_c,TS)
+      addln lrcolumns("emails: #{email_count if email_count > 0}","phone numbers: #{phone_count if phone_count > 0}")
+      r = 0
+      (0..4).reverse_each do |i|
+        addln lrcolumns( !emails[i].empty? ? " #{(email_count-(r)).abs}: #{emails[i]}" : "", !phones[i].empty? ? " #{(phone_count-(r)).abs}: #{phones[i]}" : "")
+        r += 1
+      end
+      #addln LS + H*halflen + TS + H*(cols-(halflen+3)) + RS
+      #addln V + makewidth(emails[0], (cols/2)-4 ) + V
+      addln addtocenter(hor_sep_b,BS)
+    
+      addln_nobreak '=> '
+    end
+    redraw
+    
+# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  end
+ensure
+  clean()
+end

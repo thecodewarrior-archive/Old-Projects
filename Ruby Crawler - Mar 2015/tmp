@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+
+require 'socket'
+
+
+begin
+  $parent, $child = UNIXSocket.pair
+
+
+  pid = fork do
+    Thread.new($child) do |sock|
+      while message = sock.recv(100)
+        puts message
+      end
+    end
+    loop do
+      sleep 4
+      puts "@-@-@-@-@-@-@-@"
+    end
+  end
+  
+  while true
+    $parent.write gets
+  end
+ensure
+  Process.kill 9, pid if pid
+end

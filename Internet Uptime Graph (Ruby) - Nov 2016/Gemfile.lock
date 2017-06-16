@@ -1,0 +1,27 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    backports (3.6.8)
+    bond (0.5.1)
+    daru (0.1.4.1)
+      backports
+    data_uri (0.1.0)
+    iruby (0.2.9)
+      bond (~> 0.5)
+      data_uri (~> 0.1)
+      mimemagic (~> 0.3)
+      multi_json (~> 1.11)
+    mimemagic (0.3.2)
+    multi_json (1.12.1)
+    nyaplot (0.1.6)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  daru
+  iruby
+  nyaplot
+
+BUNDLED WITH
+   1.13.6

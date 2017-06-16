@@ -1,0 +1,128 @@
+require 'uri'
+require 'yaml'
+require 'net/http'
+
+
+class Crawler
+  
+  def initialize(save)
+    @save_dir = "saves/#{save.save_dir}"
+    @queue = {}
+    @queue_add = []
+    @queue[:listener] = nil
+    @queue[:dir] = "#{@save_dir}/queue.txt"
+    @running = false
+    @crawl_thread = nil
+    #(fold)
+ # = YAML.load_file "lib/crawler/regexes.yml"
+ #    @regexes["regexes"].map! do |entry|
+ #      regexes = []
+ #      entry["regex"].each do |regex|
+ #        regexes << Regex.new regex
+ #      end
+ #      files = []
+ #      entry["file"].each do |file|
+ #        file_match = /([^#]*)(?:#(\w{1,3}))?/.match(file)
+ #        filename = file_match[1]
+ #        mod = file_match[3]
+ #        pref = case mod
+ #        when "g"
+ #          ""
+ #        when "r"
+ #          "#{@save_dir}/"
+ #        end
+ #        files << "#{pref}#{filename}"
+ #      end
+ #      {:regexes => regexes, :files => files}
+ #    end
+    #(end)
+  end
+  
+  def start()
+    @running = true
+    loop
+  end
+  
+  def stop()
+    @running = false
+  end
+  
+  def loop()
+    @crawl_thread = Thread.new do
+      while @running do
+        url = get_url
+        `perl -pi -e '$_ = "" if ( $. == 1 );' #{@queue[:dir]}`
+        crawl(url)
+      end
+    end
+  end
+  
+  def crawl(url)
+    puts url
+    x = download(url)
+    return false if x == :not_text
+    
+  end
+  
+  def download(url)
+    return :not_text unless check_headers url
+    
+  end
+  
+  def check_headers(url)
+
+    http = Net::HTTP.start('stackoverflow.com')
+
+    resp = http.head('/')
+    resp.each { |k, v| 
+      if k == "content-type"
+        if v =~ %r|text\/\w+|
+          return true
+        else
+          return false
+        end
+      end
+    }
+    http.finish
+    
+  end
+  
+  def get_url
+    File.open(@queue[:dir], &:readline)
+  end
+  
+  def start_queue_listener()
+    
+    @queue[:listener] = Thread.new do
+      Thread.current[:abort] = false
+      loop do
+        if @queue_add.length > 0
+          File.open(@queue[:dir], 'a') { |f|
+            adds = @queue_add
+            @queue_add = []
+            adds.each do |url|
+              f.puts url if url_insert_ok? url
+              break if Thread.current[:abort]
+            end
+          }
+        else
+          sleep 0.1
+        end
+        break if Thread.current[:abort]
+      end
+      
+    end
+    
+  end
+  
+  def stop_queue_listener()
+    @queue[:listener][:abort] = true
+  end
+  
+  def url_insert_ok?(url)
+    url =~ /^#{URI::regexp}$/ and system(%Q|grep -Fxq "#{url}" "#{@queue[:dir]}"|) != 0
+  end
+  
+  
+  
+end

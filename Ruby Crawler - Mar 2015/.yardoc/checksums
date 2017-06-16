@@ -1,0 +1,7 @@
+lib/save.rb 32fe11dd85d360fd4f4bcf8157249f9478c4d141
+lib/crawl.rb df1d5707b13796c50e33be12d7d132dded1405c6
+lib/helpers.rb 56afb74f1d2a0483db62a57ed8a29e6db16ef4fe
+lib/save_helpers.rb 0acd7e1cac6ee263df5c12d4a646b9d426328812
+lib/crawler/ansi.rb 7fa917fc3979d97867e4d5e9c5c7a4345613e973
+lib/crawler/crawler.rb 74fbd28d2ef38934a8802dcf273468a25c60c3da
+lib/crawler/crawl_test.rb e89668e844cb7306780d6e78e6893220dc70e739

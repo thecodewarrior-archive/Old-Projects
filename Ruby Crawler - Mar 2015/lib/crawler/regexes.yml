@@ -1,0 +1,24 @@
+regexes:
+  -
+    regex:
+      - "/\w+@\w+.\w{2,4}/"
+      - "/\w+@\w+.\w+/"
+    file:
+      - "emails#g"
+  -
+    regex:
+      - "/\(?\d\d\d\)?[-| ]\d\d\d[-| ]\d\d\d\d/"
+    file:
+      - "phones#g"
+      
+content-types:
+  - "text/*"
+    
+
+# file format:
+#   file#mod
+# mods:
+#   g - global to all crawlers (default)
+#   r - reletave to a single crawler
+#   
+# regexps can use ##filename to load a file for regexp
